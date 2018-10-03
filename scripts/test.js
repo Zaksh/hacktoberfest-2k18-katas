@@ -28,32 +28,46 @@ function runCommand(command, argv) {
 }
 
 seeChangedFiles(files => {
-  const modifiedImplemFiles = filter(files, {
-    isModified: true,
-    isTest: false,
-  });
+  const modifiedImplems = filter(files, { isModified: true, isTest: false });
+  const addedImplems = filter(files, { isAdded: true, isTest: false });
+  const addedTests = filter(files, { isAdded: true, isTest: true });
 
-  // For a PR to be valid, it needs:
-  // - A fixed implementation file
-  // - A new test case
-  // - An empty new implementation file
-  if (modifiedImplemFiles.length !== 1) {
-    const modifiedFilesList = chain(modifiedImplemFiles)
-      .map('filename')
-      .join('\n -')
-      .value();
+  // Not enough changes in this PR...
+  if (modifiedImplems.length !== 1 || addedImplems !== 1 || addedTests !== 1) {
+    console.error(`\
+###################################
+##             ERROR             ##
+###################################
 
-    console.log(
-      `This PR has changed more implementation files than necessary.` +
-        `You should only change one per PR!\n` +
-        `You changed:\n${modifiedFilesList}`
-    );
+For a Pull Request to be considered, it needs at least 3 things:
+- A modified file, containing your implementation of the Kata.
+- A new file containing the tests for your new Kata idea.
+- An empty file, where someone will implement your new Kata idea.`);
+
     process.exit(1);
     return;
   }
 
+  // More changes than necessary
+  if (files.length !== 3) {
+    console.warn(`\
+###################################
+##           WARNING             ##
+###################################
+
+It looks like you have changed more than 3 files in this PR. Could you
+check that you only committed relevant files. For example, any file
+outputted by your IDE, or by a build tool you use is not relevant. On
+the other hand, if you fixed a test case, then it's ok.
+
+Here are the files that you changed:
+${files
+      .map(f => `- ${f.filename} ${f.isAdded ? '(NEW)' : '(MODIFIED)'}`)
+      .join('\n')}`);
+  }
+
   // Find the file to test
-  const testFileToRun = modifiedImplemFiles[0].filename.replace('.', '.test.');
+  const testFileToRun = modifiedImplems[0].filename.replace('.', '.test.');
 
   // Launch the tests
   console.log('Launching test: ', `jest ${testFileToRun}`);
